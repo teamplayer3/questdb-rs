@@ -1,11 +1,12 @@
+use crate::error::SQLError;
+use crate::types::Atomicity;
+use crate::Error;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
-use crate::error::SQLError;
-use crate::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
-use crate::types::Atomicity;
+use urlencoding::encode;
 
 pub struct QuestDB {
     client: Client,
@@ -60,9 +61,14 @@ impl QuestDB {
     ///     .await
     ///     .unwrap();
     /// ```
-    pub async fn exec<T: DeserializeOwned>(&self, query: &str, limit: Option<usize>, count: Option<bool>, nm: Option<bool>)
-        -> Result<Vec<T>, crate::error::Error>
-    {
+    pub async fn exec<T: DeserializeOwned>(
+        &self,
+        query: &str,
+        limit: Option<usize>,
+        count: Option<bool>,
+        nm: Option<bool>,
+    ) -> Result<Vec<T>, crate::error::Error> {
+        let query = encode(query);
         let mut url = format!("{}/exec?query={}", self.url, query);
 
         // Check all the optional arguments and add them to the URL
@@ -76,7 +82,9 @@ impl QuestDB {
             url += format!("&nm={}", n).as_str();
         }
 
-        let res = self.client.get(url.as_str())
+        let res = self
+            .client
+            .get(url.as_str())
             .send()
             .await?
             .json::<serde_json::Value>()
@@ -88,8 +96,9 @@ impl QuestDB {
                 // The SQL failed, return an error with the error data
                 let e: SQLError = serde_json::from_value(res)?;
                 return Err(Error::SQLError(e));
-            },
-        }.to_owned();
+            }
+        }
+        .to_owned();
 
         let deserialized: Vec<T> = serde_json::from_value(deserialized)?;
 
@@ -131,10 +140,14 @@ impl QuestDB {
     ///     }
     /// };
     /// ```
-    pub async fn imp(&self, file_path: &'static str, /*schema: Option<Vec<(&'static str, Schema)>>,*/ table_name: &'static str,
-                     overwrite: Option<bool>, durable: Option<bool>, atomicity: Option<Atomicity>)
-        -> Result<(), crate::error::Error>
-    {
+    pub async fn imp(
+        &self,
+        file_path: &'static str,
+        /*schema: Option<Vec<(&'static str, Schema)>>,*/ table_name: &'static str,
+        overwrite: Option<bool>,
+        durable: Option<bool>,
+        atomicity: Option<Atomicity>,
+    ) -> Result<(), crate::error::Error> {
         let mut form = reqwest::multipart::Form::new();
         let mut url = format!("{}/imp?fmt=json&name={}", self.url, table_name);
 
@@ -175,14 +188,15 @@ impl QuestDB {
             Some(name) => name.to_str().unwrap(),
             None => filep.to_str().unwrap(),
         };
-        let part = reqwest::multipart::Part::bytes(file_bytes)
-            .file_name(file_name);
+        let part = reqwest::multipart::Part::bytes(file_bytes).file_name(file_name);
 
         // Create the form with the file part
         form = form.part("data", part);
 
         // Make the POST request
-        let _res = self.client.post(url.as_str())
+        let _res = self
+            .client
+            .post(url.as_str())
             .multipart(form)
             .send()
             .await?
@@ -218,7 +232,12 @@ impl QuestDB {
     ///     }
     /// };
     /// ```
-    pub async fn exp(&self, query: &str, limit: Option<usize>, output_file: &mut File) -> Result<(), Error> {
+    pub async fn exp(
+        &self,
+        query: &str,
+        limit: Option<usize>,
+        output_file: &mut File,
+    ) -> Result<(), Error> {
         let mut url = format!("{}/exp?query={}", self.url, query);
 
         // Check all the optional arguments and add them to the URL
@@ -227,11 +246,7 @@ impl QuestDB {
         }
 
         // Make the GET request
-        let res: String = self.client.get(url.as_str())
-            .send()
-            .await?
-            .text()
-            .await?;
+        let res: String = self.client.get(url.as_str()).send().await?.text().await?;
 
         // Try to write data to the file
         output_file.write_all(res.as_bytes())?;
