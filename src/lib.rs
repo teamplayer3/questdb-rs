@@ -15,6 +15,7 @@ pub use error::Error;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 struct TestData {
     id: i32,
     ts: String,
@@ -25,14 +26,17 @@ struct TestData {
 #[cfg(test)]
 mod tests {
     use crate::api::QuestDB;
-    use crate::TestData;
     use crate::types::Atomicity;
+    use crate::TestData;
     use std::fs::File;
 
     #[tokio::test]
     async fn test_exec() {
         let connection = QuestDB::new("http://192.168.1.37:9000");
-        let _res = match connection.exec::<TestData>("select * from readings", Some(5), None, None).await {
+        let _res = match connection
+            .exec::<TestData>("select * from readings", Some(5), None, None)
+            .await
+        {
             Ok(res) => res,
             Err(e) => {
                 println!("{}", e);
@@ -44,13 +48,16 @@ mod tests {
     #[tokio::test]
     async fn test_imp() {
         let connection = QuestDB::new("http://192.168.1.37:9000");
-        let _res = match connection.imp(
-            "./links.csv",
-            "nu_table",
-            Some(false),
-            Some(true),
-            Some(Atomicity::Strict),
-        ).await {
+        let _res = match connection
+            .imp(
+                "./links.csv",
+                "nu_table",
+                Some(false),
+                Some(true),
+                Some(Atomicity::Strict),
+            )
+            .await
+        {
             Ok(res) => res,
             Err(e) => {
                 println!("{}", e);
@@ -64,7 +71,10 @@ mod tests {
         let connection = QuestDB::new("http://192.168.1.37:9000");
 
         let mut output_file = File::create("output.csv").unwrap();
-        let _res = match connection.exp("select * from nu_table", Some(5), &mut output_file).await {
+        let _res = match connection
+            .exp("select * from nu_table", Some(5), &mut output_file)
+            .await
+        {
             Ok(res) => res,
             Err(e) => {
                 println!("{}", e);
